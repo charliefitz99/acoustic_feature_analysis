@@ -85,3 +85,4 @@ while start_sample < len(signal):
 performance = s.stop_transcribing()
 performance.to_score(composer = "matt schumaker", title = "robeson-analysis").show()
 
+# https://stackoverflow.com/questions/3694918/how-to-extract-frequency-associated-with-fft-values-in-python

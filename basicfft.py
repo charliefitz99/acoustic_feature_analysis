@@ -1,5 +1,6 @@
 import librosa
 import numpy as np
+from numpy.fft import rfft, rfftfreq
 import random
 import matplotlib.pyplot as plt
 import soundfile as sf
@@ -8,12 +9,14 @@ import scipy.io.wavfile as wavfile
 import sys
 
 def main(filename = 'fft_test.wav'):
-    signal_lib, sample_rate_lib = load_audio_librosa('fft_test.wav')
+    # signal_lib, sample_rate_lib = load_audio_librosa('fft_test.wav')
     signal_scip, sample_rate_scip = load_audio_scipy('fft_test.wav')
 
     # mono signals
-    mono_lib = make_mono(signal_lib)
+    # mono_lib = make_mono(signal_lib)
     mono_scip = make_mono(signal_scip)
+
+    fft_analysis(signal_scip, sample_rate_scip)
 
     # # plot testing
     # plot_values(mono_lib, sample_rate_lib)
@@ -26,20 +29,18 @@ def main(filename = 'fft_test.wav'):
     #         print("lib: " + str(mono_lib[i]) + " scip: " + str(mono_scip[i]))
     #     i +=1
 
-
-
-def load_audio_librosa(file_name, data_dir = 'soundfiles/'):
+def load_audio_librosa(file_name, data_dir = 'soundfiles/', sr = 44100):
     file_name = data_dir + file_name
-    print("File: " + file_name)
-    signal, sample_rate = librosa.load(file_name, sr=44100)
-    print("Librosa Sample Rate: " + str(sample_rate))
+    print("File: %s" % file_name)
+    signal, sample_rate = librosa.load(file_name, sr=sr)
+    print("Librosa Sample Rate: %d" % sample_rate)
     return signal, sample_rate
 
 def load_audio_scipy(file_name, data_dir = 'soundfiles/'):
     file_name = data_dir + file_name
-    print("File: " + file_name)
+    print("File: %s" % file_name)
     sample_rate, signal = wavfile.read(file_name)
-    print("scipy Sample Rate: " + str(sample_rate))
+    print("scipy Sample Rate: %d samples/sec" % sample_rate)
     return signal, sample_rate
 
 def plot_values(mono_signal, sample_rate):
@@ -56,11 +57,32 @@ def make_mono(signal, channel = 0):
     if signal.ndim == 2:
         return signal[:,channel]
     else:
-        print("Signal not stereo, has " + str(signal.ndim) + " dimensions")
+        print("Signal not stereo, has %d dimension " % signal.ndim)
         return signal
 
+# def schumaker_fft(signal, sample_rate, window_size = 2**14):
 
+def fft_analysis(signal, sample_rate, window_size = 2**14):
+    print("FFT window size: %d samples"  % window_size) 
+    # print("Sample Rate: " + str(sample_rate))
+    print("Window Duration: %.4f seconds" % (window_size/sample_rate))
     
+    window_start = 0
+    while(window_start < len(signal)):
+        window = signal[window_start: window_start + window_size]
+
+        fft_out = rfft(signal)
+        frequencies = rfftfreq(window_size, 1/sample_rate)
+
+        magnitudes = np.abs(fft_out) 
+        magnitudes = (magnitudes * 2)/float(window_size)
+
+        window_start = len(signal)
+    print(len(magnitudes))
+    print(magnitudes.ndim)
+
+    print(len(frequencies))
+    print(frequencies.ndim)
     
 
 if __name__ == "__main__":
