@@ -9,7 +9,7 @@ import scipy.io.wavfile as wavfile
 import sys
 
 def main(filename = 'fft_test.wav'):
-    signal_lib, sample_rate_lib = load_audio_librosa('fft_test.wav')
+    signal_lib, sample_rate_lib = load_audio_librosa(filename)
     # signal_scip, sample_rate_scip = load_audio_scipy('fft_test.wav')
 
     # mono signals
@@ -98,18 +98,26 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=4096, hop_length = 512, num_
     # max_frequency[2]
     while(time < len(S[0])):
         freq = 0
-        max_freq = []
-        max_freq.append(0)
-        max_freq.append(0)
-        max_freq.append(0)
+        max_freqs = [[0] * 4] * num_loudest # creates a 2d array of num_loudest number of loudest bins
+        print(max_freqs)
         while(freq < n_fft/2):
             # print(freq)
-            if(max_freq[1] < S[freq][time]):
-                max_freq[0] = time*hop_length/sample_rate
-                max_freq[1] = S[freq][time]
-                max_freq[2] = freq*(sample_rate/n_fft)
+            i = 0
+            for max_freq in max_freqs:
+                i = 0
+                if(max_freq[1] < S[freq][time]): # greater than one of the max_frequency amplitudes    
+                    max_freqs[num_loudest-1][0] = time*hop_length/sample_rate # time
+                    max_freqs[num_loudest-1][1] = S[freq][time] # amplitude row
+                    max_freqs[num_loudest-1][2] = freq*(sample_rate/n_fft) # frequency
+                    max_freqs[num_loudest-1][3] = freq #frequency bin
+                    max_freqs.sort(key = lambda row: (row[3], row[1]))
+                    # print("time: {:2.4f} bin_number: {} frequency: {:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], max_freq[1]))
+
+                    break
+                i += 1
             freq += 1
-        print("time: {:4f} frequency: {:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[2], max_freq[1]))
+        for max_freq in max_freqs:
+            print("time: {:2.4f} bin_number: {} frequency: {:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], max_freq[1]))
 
         time += 1
 
