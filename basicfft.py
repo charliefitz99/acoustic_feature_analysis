@@ -24,7 +24,7 @@ def main(filename = 'fft_test.wav'):
     # plot_values(mono_lib, sample_rate_lib)
     # plot_values(mono_scip, sample_rate_scip)
 
-    # # compare data
+    # # # compare data
     # i = 0
     # while (i < len(mono_lib)):
     #     if(mono_lib[i] != mono_scip[i]):
@@ -73,7 +73,7 @@ def numpy_fft_analysis(signal, sample_rate, window_size = 2**14):
     while(window_start < len(signal)):
         window = signal[window_start: window_start + window_size]
 
-        fft_out = rfft(signal)
+        fft_out = rfft(window)
         frequencies = rfftfreq(window_size, 1/sample_rate)
 
         magnitudes = np.abs(fft_out) 
