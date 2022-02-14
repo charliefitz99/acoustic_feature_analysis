@@ -9,14 +9,16 @@ import scipy.io.wavfile as wavfile
 import sys
 
 def main(filename = 'fft_test.wav'):
-    # signal_lib, sample_rate_lib = load_audio_librosa('fft_test.wav')
-    signal_scip, sample_rate_scip = load_audio_scipy('fft_test.wav')
+    signal_lib, sample_rate_lib = load_audio_librosa('fft_test.wav')
+    # signal_scip, sample_rate_scip = load_audio_scipy('fft_test.wav')
 
     # mono signals
     # mono_lib = make_mono(signal_lib)
-    mono_scip = make_mono(signal_scip)
+    # mono_scip = make_mono(signal_scip)
 
-    fft_analysis(signal_scip, sample_rate_scip)
+    # numpy_fft_analysis(signal_scip, sample_rate_scip)
+    librosa_fft_analysis(signal_lib, sample_rate_lib, 2048)
+
 
     # # plot testing
     # plot_values(mono_lib, sample_rate_lib)
@@ -29,7 +31,7 @@ def main(filename = 'fft_test.wav'):
     #         print("lib: " + str(mono_lib[i]) + " scip: " + str(mono_scip[i]))
     #     i +=1
 
-def load_audio_librosa(file_name, data_dir = 'soundfiles/', sr = 44100):
+def load_audio_librosa(file_name, data_dir = 'soundfiles/', sr = 22050):
     file_name = data_dir + file_name
     print("File: %s" % file_name)
     signal, sample_rate = librosa.load(file_name, sr=sr)
@@ -62,7 +64,7 @@ def make_mono(signal, channel = 0):
 
 # def schumaker_fft(signal, sample_rate, window_size = 2**14):
 
-def fft_analysis(signal, sample_rate, window_size = 2**14):
+def numpy_fft_analysis(signal, sample_rate, window_size = 2**14):
     print("FFT window size: %d samples"  % window_size) 
     # print("Sample Rate: " + str(sample_rate))
     print("Window Duration: %.4f seconds" % (window_size/sample_rate))
@@ -83,7 +85,46 @@ def fft_analysis(signal, sample_rate, window_size = 2**14):
 
     print(len(frequencies))
     print(frequencies.ndim)
+
+def librosa_fft_analysis(signal, sample_rate, n_fft=4096, hop_length = 512, num_loudest = 5):
+    # test_file_path = resources.sample_wav_file('wav_1.wav')
+    # y, sr = librosa.load(test_file_path, sr=None)
+    # frames = librosa.util.frame(signal, frame_length=2048, hop_length=1024)
+    print(signal.shape)
+    S = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
+    print("interval = %.4f seconds" % hop_length)
+    print(S.shape)
+    time = 0
+    # max_frequency[2]
+    while(time < len(S[0])):
+        freq = 0
+        max_freq = []
+        max_freq.append(0)
+        max_freq.append(0)
+        max_freq.append(0)
+        while(freq < n_fft/2):
+            # print(freq)
+            if(max_freq[1] < S[freq][time]):
+                max_freq[0] = time*hop_length/sample_rate
+                max_freq[1] = S[freq][time]
+                max_freq[2] = freq*(sample_rate/n_fft)
+            freq += 1
+        print("time: {:4f} frequency: {:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[2], max_freq[1]))
+
+        time += 1
+
+    # parse all frequencies in X dimension at Y time, get loudest
     
+    # for x in S:
+    #     count_outer += 1
+    #     count_inner = 0
+    #     for val in x:
+
+    #         print("frequency (Hz): {} amplitude (dBFS?): {:4f} time (seconds): {:4f}s".format(count_outer*(sample_rate/n_fft), val, count_inner*hop_length/sample_rate ))
+    # for bin 
+    
+
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
