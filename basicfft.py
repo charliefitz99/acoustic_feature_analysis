@@ -17,7 +17,7 @@ def main(filename = 'fft_test.wav'):
     # mono_scip = make_mono(signal_scip)
 
     # numpy_fft_analysis(signal_scip, sample_rate_scip)
-    librosa_fft_analysis(signal_lib, sample_rate_lib, 2048)
+    librosa_fft_analysis(signal=signal_lib, sample_rate=sample_rate_lib, fps=3, n=3)
 
 
     # # plot testing
@@ -86,10 +86,11 @@ def numpy_fft_analysis(signal, sample_rate, window_size = 2**14):
     print(len(frequencies))
     print(frequencies.ndim)
 
-def librosa_fft_analysis(signal, sample_rate, n_fft=4096, hop_length = 512, num_loudest = 5):
+def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n = 3):
     # test_file_path = resources.sample_wav_file('wav_1.wav')
     # y, sr = librosa.load(test_file_path, sr=None)
     # frames = librosa.util.frame(signal, frame_length=2048, hop_length=1024)
+    hop_length = int(sample_rate/fps) # distance in samples between each fft (inclusive?) = samples per second/frames per second
     print(signal.shape)
     S = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
     print("interval = %.4f seconds" % hop_length)
@@ -98,28 +99,50 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=4096, hop_length = 512, num_
     # max_frequency[2]
     while(time < len(S[0])):
         freq = 0
-        max_freqs = [[0] * 4] * num_loudest # creates a 2d array of num_loudest number of loudest bins
+        # max_freqs = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0] # creates a 2d array of num_loudest number of loudest bins
+        max_freqs = [[0 for x in range(4)] for y in range(n)] # creates a 2d array of num_loudest number of loudest bins
         print(max_freqs)
         while(freq < n_fft/2):
             # print(freq)
             i = 0
-            for max_freq in max_freqs:
-                i = 0
-                if(max_freq[1] < S[freq][time]): # greater than one of the max_frequency amplitudes    
-                    max_freqs[num_loudest-1][0] = time*hop_length/sample_rate # time
-                    max_freqs[num_loudest-1][1] = S[freq][time] # amplitude row
-                    max_freqs[num_loudest-1][2] = freq*(sample_rate/n_fft) # frequency
-                    max_freqs[num_loudest-1][3] = freq #frequency bin
-                    max_freqs.sort(key = lambda row: (row[3], row[1]))
-                    # print("time: {:2.4f} bin_number: {} frequency: {:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], max_freq[1]))
+            empty = False
+            while i < n: # check if max_frequency array has empty entries
+                # print("CHECKING EMPTY LOOP {} {} {:.4f} {}".format(time, freq,S[freq][time], i))
+                if max_freqs[i][1] == float(0.0000): # does this convert to int?
+                    max_freqs[i][0] = time*hop_length/sample_rate
+                    max_freqs[i][1] = S[freq][time]
+                    max_freqs[i][2] = freq*(sample_rate/n_fft)
+                    max_freqs[i][3] = freq
 
-                    break
-                i += 1
+                    empty = True
+                    i = n
+                i = i + 1
+            smallest = float(100) # smallest amplitude
+            smallest_index = 0 # index of max_frequency with smallest amplitude
+            i = 0
+            if(empty == False): # if not false replace smallest amplitude to replace
+                # print("HERE {}".format(freq))
+
+                while i < n: # find smallest bin
+                    if smallest > max_freqs[i][1]:
+                        smallest = max_freqs[i][1]
+                        smallest_index = i                
+                    i = i + 1
+                # print("Smallest: {}".format(smallest))
+                if(smallest < S[freq][time]): # is smallest bin less than current amplitude
+                    max_freqs[smallest_index][0] = time*hop_length/sample_rate
+                    max_freqs[smallest_index][1] = S[freq][time]
+                    max_freqs[smallest_index][2] = freq*(sample_rate/n_fft)
+                    max_freqs[smallest_index][3] = freq
+            # print(max_freqs)
             freq += 1
+        # print(max_freqs)
         for max_freq in max_freqs:
-            print("time: {:2.4f} bin_number: {} frequency: {:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], max_freq[1]))
-
+            # print("time: {:2.4f} bin_number: {} frequency: {:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], max_freq[1]))
+            print("time: {:2.4f} bin_number: {} frequency range: {:.4f}-{:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], (max_freq[3]+1)*sample_rate/n_fft, max_freq[1]))
         time += 1
+        # if(time == 19):
+        #     time = len(S[0])
 
     # parse all frequencies in X dimension at Y time, get loudest
     
