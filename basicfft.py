@@ -8,7 +8,7 @@ from glob import glob
 import scipy.io.wavfile as wavfile
 import sys
 
-def main(filename = 'fft_test.wav'):
+def main(filename = 'fft_test.wav', n = 2, fps = 3):
     signal_lib, sample_rate_lib = load_audio_librosa(filename)
     # signal_scip, sample_rate_scip = load_audio_scipy('fft_test.wav')
 
@@ -17,7 +17,7 @@ def main(filename = 'fft_test.wav'):
     # mono_scip = make_mono(signal_scip)
 
     # numpy_fft_analysis(signal_scip, sample_rate_scip)
-    librosa_fft_analysis(signal=signal_lib, sample_rate=sample_rate_lib, fps=3, n=3)
+    librosa_fft_analysis(signal=signal_lib, sample_rate=sample_rate_lib, fps=fps, n=n)
 
 
     # # plot testing
@@ -91,7 +91,7 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n = 3):
     # y, sr = librosa.load(test_file_path, sr=None)
     # frames = librosa.util.frame(signal, frame_length=2048, hop_length=1024)
     hop_length = int(sample_rate/fps) # distance in samples between each fft (inclusive?) = samples per second/frames per second
-    print(signal.shape)
+    # print(signal.shape)
     S = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
     print("interval = %.4f seconds" % hop_length)
     print(S.shape)
@@ -101,7 +101,7 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n = 3):
         freq = 0
         # max_freqs = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0] # creates a 2d array of num_loudest number of loudest bins
         max_freqs = [[0 for x in range(4)] for y in range(n)] # creates a 2d array of num_loudest number of loudest bins
-        print(max_freqs)
+        # print(max_freqs)
         while(freq < n_fft/2):
             # print(freq)
             i = 0
@@ -137,9 +137,17 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n = 3):
             # print(max_freqs)
             freq += 1
         # print(max_freqs)
-        for max_freq in max_freqs:
-            # print("time: {:2.4f} bin_number: {} frequency: {:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], max_freq[1]))
-            print("time: {:2.4f} bin_number: {} frequency range: {:.4f}-{:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], (max_freq[3]+1)*sample_rate/n_fft, max_freq[1]))
+        i = 0
+        loudest = 0
+        while (i < n):
+            if(max_freqs[i][1] > loudest):
+                loudest = max_freqs[i][1]
+            i += 1
+        if(loudest > 1):
+            print("{} loudest partials at time = {:2.4f} seconds".format(n, time*hop_length/sample_rate))
+            for max_freq in max_freqs:
+                # print("time: {:2.4f} bin_number: {} frequency: {:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], max_freq[1]))
+                print("time: {:2.4f} bin_number: {} frequency range: {:.4f}-{:.4f} amplitude: {:.4f}".format(max_freq[0], max_freq[3], max_freq[2], (max_freq[3]+1)*sample_rate/n_fft, max_freq[1]))
         time += 1
         # if(time == 19):
         #     time = len(S[0])
@@ -158,7 +166,13 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n = 3):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
-        main(sys.argv[1]) 
-    else:
+    if len(sys.argv) == 1:
         main()
+    elif len(sys.argv) == 2:
+        main(sys.argv[1]) 
+    elif len(sys.argv) == 3:
+        main(sys.argv[1], int(sys.argv[2])) 
+    elif len(sys.argv) == 4:
+        main(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))     
+    else:
+        print("Usage: basicfft.py <filename> <n loudest partials> <frames per second>")
