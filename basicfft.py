@@ -10,6 +10,11 @@ import scipy.io.wavfile as wavfile
 import sys
 import os
 
+# default use cases for running from thonny
+default_file = 'fft_test.wav'
+default_n = 10
+default_fps = 15 # change to 'os' for onset mode 
+
 # constants for pitch detection
 A4 = 440
 C0 = A4*pow(2, -4.75)
