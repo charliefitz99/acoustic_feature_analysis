@@ -21,6 +21,7 @@ C0 = A4*pow(2, -4.75)
 note_vals = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 # controls for csv info
+write_frequencies = False
 write_amplitudes = False
 write_notes = True
 write_transcribed_note = True # only applies if write notes is true
@@ -120,7 +121,8 @@ def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes):
     i = 1
     file.write("time")
     while i < n + 1:
-        file.write(", frequency %d"% i) 
+        if(write_frequencies):
+            file.write(", frequency %d"% i) 
         if(write_notes):
             file.write(", note %d" % i)
         if(write_amplitudes):
@@ -134,7 +136,8 @@ def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes):
         file.write("%.3f" % (times[i]))
         j = 0
         while j < n:
-            file.write(", %.4f" %frequencies[i][j])
+            if(write_frequencies):
+                file.write(", %.4f" %frequencies[i][j])
             if(write_notes):
                 file.write(", %s" % convert_to_pitch(frequencies[i][j]))
             if(write_amplitudes):
