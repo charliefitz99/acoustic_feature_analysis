@@ -12,8 +12,8 @@ import os
 
 # default use cases for running from thonny
 default_file = 'fft_test.wav'
-default_n = 10
 default_fps = 15 # change to 'os' for onset mode 
+default_n = 10
 
 # constants for pitch detection
 A4 = 440
@@ -29,7 +29,7 @@ write_transcribed_note = True # only applies if write notes is true
     # int exclusion_threshold <- write below certain amplitude
     # bool create_pitch_csv <- create separate csv for pitch values
 
-def main(filename='fft_test.wav', fps='os', n = 2):
+def main(filename=default_file, fps=default_fps, n = default_n):
     
     # load signal(s) from default audio directory 'soundfiles/'
     signal_lib, sample_rate_lib = load_audio_librosa(filename) # in stereo?
