@@ -15,8 +15,6 @@ A4 = 440
 C0 = A4*pow(2, -4.75)
 note_vals = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
-onset_mode = False
-
 # controls for csv info
 write_amplitudes = True
 write_notes = True
