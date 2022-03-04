@@ -18,13 +18,13 @@ note_vals = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 # controls for csv info
 write_amplitudes = False
 write_notes = True
-write_transcribed_note = True #only applies if write notes is true
+write_transcribed_note = True # only applies if write notes is true
 # TODO: 
     # bool exclude_below_threshold <- boolean for excluding partials that are too quiet
     # int exclusion_threshold <- write below certain amplitude
     # bool create_pitch_csv <- create separate csv for pitch values
 
-def main(filename, fps, n = 2):
+def main(filename='fft_test.wav', fps='os', n = 2):
     
     # load signal(s) from default audio directory 'soundfiles/'
     signal_lib, sample_rate_lib = load_audio_librosa(filename) # in stereo?
@@ -163,7 +163,7 @@ def get_onset_times(signal, sample_rate):
 def onset_fft_analysis(signal, sample_rate, n_fft = 2048, n = 2):
     onset_times = get_onset_times(signal, sample_rate)
     print(onset_times)
-    fps = 50
+    fps = 100
     times, frequencies, amplitudes = librosa_fft_analysis(signal, sample_rate, n_fft, fps, n)  
     
     onset_frame_times = []
@@ -276,7 +276,9 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n=2):
     return times, frequencies, amplitudes 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 1:
+        main()
+    elif len(sys.argv) == 2:
         main(sys.argv[1]) 
     elif len(sys.argv) == 3:
         main(sys.argv[1], sys.argv[2]) 
