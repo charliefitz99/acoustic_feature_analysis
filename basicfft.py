@@ -16,9 +16,9 @@ C0 = A4*pow(2, -4.75)
 note_vals = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 # controls for csv info
-write_amplitudes = True
+write_amplitudes = False
 write_notes = True
-write_transcribed_note = True # only applies if write notes is true
+write_transcribed_note = True #only applies if write notes is true
 # TODO: 
     # bool exclude_below_threshold <- boolean for excluding partials that are too quiet
     # int exclusion_threshold <- write below certain amplitude
