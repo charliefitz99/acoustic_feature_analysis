@@ -10,19 +10,13 @@ import scipy.io.wavfile as wavfile
 import sys
 import os
 
-# default use cases for running from thonny
-default_file = 'fft_test.wav'
-default_fps = 15 # change to 'os' for onset mode 
-default_n = 10
-
 # constants for pitch detection
 A4 = 440
 C0 = A4*pow(2, -4.75)
 note_vals = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 # controls for csv info
-write_frequencies = False
-write_amplitudes = False
+write_amplitudes = True
 write_notes = True
 write_transcribed_note = True # only applies if write notes is true
 # TODO: 
@@ -30,7 +24,7 @@ write_transcribed_note = True # only applies if write notes is true
     # int exclusion_threshold <- write below certain amplitude
     # bool create_pitch_csv <- create separate csv for pitch values
 
-def main(filename=default_file, fps=default_fps, n = default_n):
+def main(filename, fps, n = 2):
     
     # load signal(s) from default audio directory 'soundfiles/'
     signal_lib, sample_rate_lib = load_audio_librosa(filename) # in stereo?
@@ -40,8 +34,12 @@ def main(filename=default_file, fps=default_fps, n = default_n):
         times, frequencies, amplitudes = onset_fft_analysis(signal = signal_lib, sample_rate=sample_rate_lib, n=n)
         csv_write(filename, True, 0, n, times, frequencies, amplitudes)
     else:
-        times, frequencies, amplitudes = librosa_fft_analysis( signal=signal_lib, sample_rate=sample_rate_lib, fps=int(fps), n=n)
+        # times, frequencies, amplitudes = librosa_fft_analysis( signal=signal_lib, sample_rate=sample_rate_lib, fps=int(fps), n=n)
+        centroid_calculation(signal = signal_lib, sample_rate=sample_rate_lib, fps = int(fps))
+        # print(librosa.feature.spectral_centroid(y= signal_lib, sr= sample_rate_lib))
+        times, frequencies, amplitudes = n_loudest_peaks( signal=signal_lib, sample_rate=sample_rate_lib, fps=int(fps), n=n)
         csv_write(filename, False, int(fps), n, times, frequencies, amplitudes)
+        
         # filename, fps, n, times, frequencies, amplitudes 
     # fft loudest partial collections
     # # experimental specgram plotting ----------------------------
@@ -121,8 +119,7 @@ def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes):
     i = 1
     file.write("time")
     while i < n + 1:
-        if(write_frequencies):
-            file.write(", frequency %d"% i) 
+        file.write(", frequency %d"% i) 
         if(write_notes):
             file.write(", note %d" % i)
         if(write_amplitudes):
@@ -135,9 +132,8 @@ def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes):
     while i < len(times):
         file.write("%.3f" % (times[i]))
         j = 0
-        while j < n:
-            if(write_frequencies):
-                file.write(", %.4f" %frequencies[i][j])
+        while j < len(frequencies[i]):
+            file.write(", %.4f" %frequencies[i][j])
             if(write_notes):
                 file.write(", %s" % convert_to_pitch(frequencies[i][j]))
             if(write_amplitudes):
@@ -171,8 +167,8 @@ def get_onset_times(signal, sample_rate):
 def onset_fft_analysis(signal, sample_rate, n_fft = 2048, n = 2):
     onset_times = get_onset_times(signal, sample_rate)
     print(onset_times)
-    fps = 100
-    times, frequencies, amplitudes = librosa_fft_analysis(signal, sample_rate, n_fft, fps, n)  
+    fps = 50
+    times, frequencies, amplitudes = n_loudest_peaks(signal, sample_rate, n_fft, fps, n)  
     
     onset_frame_times = []
     onset_frequencies = []
@@ -180,7 +176,7 @@ def onset_fft_analysis(signal, sample_rate, n_fft = 2048, n = 2):
 
     for onset_time in onset_times:
         i = 0
-        while i < len(times):
+        while i < len(times)-1:
             if(onset_time <= times[i]):
                 onset_frame_times.append(times[i])
                 onset_frequencies.append(frequencies[i])
@@ -190,7 +186,97 @@ def onset_fft_analysis(signal, sample_rate, n_fft = 2048, n = 2):
 
     return onset_frame_times, onset_frequencies, onset_amplitudes
 
+
+def centroid_calculation(signal, sample_rate, n_fft=4096, fps=3, n=2):
+    hop_length = int(sample_rate/fps)
+    fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
+    fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
+    fft_freqs = librosa.fft_frequencies(sr = sample_rate, n_fft = n_fft)
+    time_index = 0 
+    while time_index < len(fft_set[0]):
+        
+        # Sum of weighted amplitudes
+        # Sum of amplitudes
+        k = 0 
+        j = 0
+        max_amp = 0
+        freq_index = 0
+        while freq_index < (n_fft/2):
+            k += fft_set[freq_index, time_index]*fft_freqs[freq_index]     
+            j += fft_set[freq_index, time_index]
+            freq_index += 1
+            if max_amp < fft_set[freq_index, time_index]:
+                max_amp = fft_set[freq_index, time_index]
+        centroid = k/j
+        # print("Time: %.4f centroid: %.6f" %(time_index*hop_length/sample_rate, centroid))
+        if max_amp > 1:
+            print("Time: %d centroid: %.6f" %(time_index, centroid))
+        time_index +=1
+
+
+def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
+    hop_length = int(sample_rate/fps)
+    fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
+    fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
+    time_index = 0 
+    frequencies = []
+    amplitudes = []
+    times = []
     
+    # Reference array containing corresponding frequency values relative to bin indexes
+    fft_freqs = librosa.fft_frequencies(sr = sample_rate, n_fft = n_fft)
+    # print(fft_set.shape)
+    # peaks = np.zeros(fft_set.shape)
+    # print(peaks.shape)
+    while time_index < len(fft_set[0]):
+    
+        # Grab peak bin indexes ----------------------------------------------------------
+        # parse vertically through amplitude at frequency bins at time time_index
+        freq_index = 1
+        # if(time_index == 4):
+        peak_indexes = []
+
+        while (freq_index < (n_fft/2)):
+            if(fft_set[freq_index, time_index] > fft_set[freq_index-1, time_index]):
+                if (fft_set[freq_index, time_index] > fft_set[freq_index+1, time_index]):
+                    if(fft_set[freq_index, time_index] > 1):
+                        peak_indexes.append(freq_index)
+                        # print("time %.4f index %d freq %.6f amp %.6f" %(time_index*hop_length/sample_rate, freq_index, fft_freqs[freq_index], fft_set[freq_index, time_index]))
+            freq_index += 1
+        # print("Number Peaks: %d" %len(peak_indexes))
+        # -------------------------------------------------------------------------
+
+        # Set non peak bins to 0 --------------------------------------------------
+        freq_index = 0
+        while(freq_index < (n_fft/2)+1):
+            is_peak = False
+            for index in peak_indexes:
+                if freq_index == index:
+                    is_peak = True
+            if is_peak == False:
+                fft_set[freq_index, time_index] = 0
+            freq_index += 1
+            
+
+        # -------------------------------------------------------------------------
+
+        # Grab loudest of peak bins -----------------------------------------------
+        if(len(peak_indexes) < n):
+            n_loudest_indexes = np.argsort(-fft_set[:,time_index])[:len(peak_indexes)]
+        else:    
+            n_loudest_indexes = np.argsort(-fft_set[:,time_index])[:n]
+        n_loudest_amplitudes = fft_set[n_loudest_indexes, time_index]
+
+        frequency_array = fft_freqs[n_loudest_indexes]
+        frequencies.append(frequency_array)
+        amplitudes.append(n_loudest_amplitudes)
+        times.append((time_index*hop_length/sample_rate))
+        # -------------------------------------------------------------------------
+
+        time_index+=1
+    return times, frequencies, amplitudes
+
+
 # acquire n loudest partials from sample using librosa fft
 # Parameters:
 #   signal <- librosa audio file 
@@ -202,7 +288,7 @@ def onset_fft_analysis(signal, sample_rate, n_fft = 2048, n = 2):
 #   1D array times <- times belonging to data capture
 #   2D array frequencies <- n loudest frequencies for len(time) times
 #   2D array amplitudes <- corresponding n loudest amplitudes for len(time) times
-def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n=2):
+def librosa_fft_analysis(signal, sample_rate, n_fft=4096, fps=3, n=2):
     
     # TODO is the fft exclusive or inclusive time hop?
     # distance in samples between each fft analysis
@@ -212,8 +298,7 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n=2):
     fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
     
     # print relevant information on analysis
-    print("interval = %d samples, %.3f seconds" %(hop_length, hop_length/sample_rate))
-    print("n_fft = %d bins" % n_fft)
+    fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
     # print(fft_set.shape)
 
     # time index for parsing horizonatally
@@ -223,7 +308,7 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n=2):
     frequencies = []
     amplitudes = []
     times = []
-    
+    # peak_array = [][]
     # EXAMPLE STFT ARRAY:
         # ff = final frame = song_len {in samples} / hop_length = len(fft_set[0])
         # bin frequency = determine with librosa.fft_frequencies
@@ -242,7 +327,9 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n=2):
 
     # parse through time horizontally and get loudest frequencies at each time
     while(time_index < len(fft_set[0])):
+
         
+        # Grab loudest bins -------------------------------------------------------
         # obtain sorted array of n bin indexes by amplitude value at time index
         n_loudest_indexes = np.argsort(-fft_set[:,time_index])[:n]
         # sorted array of n loudest amplitudes at time index 
@@ -259,14 +346,9 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n=2):
         frequencies.append(frequency_array)
         amplitudes.append(n_loudest_amplitudes)
         times.append((time_index*hop_length/sample_rate))
+        # -------------------------------------------------------------------------
 
-        # # OLD parse vertically through amplitude at frequency bins at time time_index
-        # freq_index = 0
-        # if(time_index == 4):
-        #     while (freq_index < (n_fft/2)+1):
-        #         print("time %d freq %d amp %.6f" %(time_index, freq_index, fft_set[freq_index, time_index]))
-        #         freq_index += 1
-        
+        # Increment time index horizontally
         time_index += 1
     
     # # print in order
@@ -282,11 +364,10 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=2048, fps=3, n=2):
     # print(frequencies)
     # print(times)
     return times, frequencies, amplitudes 
+    
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        main()
-    elif len(sys.argv) == 2:
+    if len(sys.argv) == 2:
         main(sys.argv[1]) 
     elif len(sys.argv) == 3:
         main(sys.argv[1], sys.argv[2]) 
