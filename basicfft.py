@@ -192,8 +192,10 @@ def centroid_calculation(signal, sample_rate, n_fft=4096, fps=3, n=2):
     fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
     fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
     fft_freqs = librosa.fft_frequencies(sr = sample_rate, n_fft = n_fft)
-    time_index = 0 
-    while time_index < len(fft_set[0]):
+    time_index = 0
+    file = open("outputfiles/centroid_log.csv", "w")
+    file.write("Time, Centroid\n")
+    while time_index < len(fft_set[0])-1:
         
         # Sum of weighted amplitudes
         # Sum of amplitudes
@@ -201,7 +203,7 @@ def centroid_calculation(signal, sample_rate, n_fft=4096, fps=3, n=2):
         j = 0
         max_amp = 0
         freq_index = 0
-        while freq_index < (n_fft/2):
+        while freq_index < (n_fft/2)-1:
             k += fft_set[freq_index, time_index]*fft_freqs[freq_index]     
             j += fft_set[freq_index, time_index]
             freq_index += 1
@@ -210,7 +212,11 @@ def centroid_calculation(signal, sample_rate, n_fft=4096, fps=3, n=2):
         centroid = k/j
         # print("Time: %.4f centroid: %.6f" %(time_index*hop_length/sample_rate, centroid))
         if max_amp > 1:
-            print("Time: %d centroid: %.6f" %(time_index, centroid))
+            # print("Time: %.6f centroid: %.6f" %(time_index*hop_length/sample_rate, centroid))
+            # file.write("Time: %")
+            file.write("%.6f, %.6f\n" %(time_index*hop_length/sample_rate, centroid))
+        else:
+            file.write("\n")
         time_index +=1
 
 
