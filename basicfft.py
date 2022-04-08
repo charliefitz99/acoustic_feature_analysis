@@ -24,7 +24,11 @@ write_transcribed_note = True # only applies if write notes is true
     # int exclusion_threshold <- write below certain amplitude
     # bool create_pitch_csv <- create separate csv for pitch values
 
-def main(filename, fps, n = 2):
+default_name = 'fft_test.wav'
+default_fps = 24
+default_n_partials = 15
+
+def main(filename= default_name, fps=default_fps, n = default_n_partials):
     
     # load signal(s) from default audio directory 'soundfiles/'
     signal_lib, sample_rate_lib = load_audio_librosa(filename) # in stereo?
@@ -373,7 +377,9 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=4096, fps=3, n=2):
     
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 1:
+        main()
+    elif len(sys.argv) == 2:
         main(sys.argv[1]) 
     elif len(sys.argv) == 3:
         main(sys.argv[1], sys.argv[2]) 
