@@ -15,10 +15,16 @@ A4 = 440
 C0 = A4*pow(2, -4.75)
 note_vals = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
+# write only one loudest bin per note
+filter_notes = True
+
 # controls for csv info
 write_amplitudes = True
 write_notes = True
-write_transcribed_note = True # only applies if write notes is true
+write_transcribed_note = False # only applies if write notes is true
+round_midi = True
+write_houdini = True
+
 # TODO: 
     # bool exclude_below_threshold <- boolean for excluding partials that are too quiet
     # int exclusion_threshold <- write below certain amplitude
@@ -42,6 +48,8 @@ def main(filename= default_name, fps=default_fps, n = default_n_partials):
         centroid_calculation(signal = signal_lib, sample_rate=sample_rate_lib, fps = int(fps))
         # print(librosa.feature.spectral_centroid(y= signal_lib, sr= sample_rate_lib))
         times, frequencies, amplitudes = n_loudest_peaks( signal=signal_lib, sample_rate=sample_rate_lib, fps=int(fps), n=n)
+        if filter_notes:
+            filter_partials_note(times, frequencies, amplitudes)
         csv_write(filename, False, int(fps), n, times, frequencies, amplitudes)
         
         # filename, fps, n, times, frequencies, amplitudes 
@@ -94,14 +102,17 @@ def convert_to_pitch(frequency):
     
     # check if frequency is 0 (likely error)
     if(frequency != 0):
-        midi_num = round(12*log2(frequency/C0))
-        
         if(write_transcribed_note):
+            midi_num = round(12*log2(frequency/C0))
             octave = midi_num//12 # floor division for octave number
             note_index = midi_num % 12 
             return note_vals[note_index] + str(octave)
         else:
-            return str(midi_num+12)
+            if(round_midi):
+                midi_num = round(12*log2(frequency/C0))
+            else:
+                midi_num = round(12*log2(frequency/C0), 2)
+            return midi_num+12
 
     # write error character if frequency is 0
     else:
@@ -110,44 +121,99 @@ def convert_to_pitch(frequency):
 
 # write results to csv
 def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes):
+    if(write_houdini == False):
+        # split file extension and append fps/bucket info
+        if(os_mode == False):
+            out_name = filename.split('.')[0] + "_fps%d_n%d.csv" %(fps, n)
+        else:
+            out_name = filename.split('.')[0] + "_os_n%d.csv" % n
+        file = open("outputfiles/%s" %out_name, "w")
+        print("Writing to csv at outputfiles/%s"%out_name)
 
-    # split file extension and append fps/bucket info
-    if(os_mode == False):
-        out_name = filename.split('.')[0] + "_fps%d_n%d.csv" %(fps, n)
-    else:
-        out_name = filename.split('.')[0] + "_os_n%d.csv" % n
-    file = open("outputfiles/%s" %out_name, "w")
-    print("Writing to csv at outputfiles/%s"%out_name)
-
-    # write csv headers
-    i = 1
-    file.write("time")
-    while i < n + 1:
-        file.write(", frequency %d"% i) 
-        if(write_notes):
-            file.write(", note %d" % i)
-        if(write_amplitudes):
-            file.write(", amplitude %d" %i)
-        i+=1
-    file.write("\n")
-
-    # write data
-    i = 0
-    while i < len(times):
-        file.write("%.3f" % (times[i]))
-        j = 0
-        while j < len(frequencies[i]):
-            file.write(", %.4f" %frequencies[i][j])
+        # write csv headers
+        i = 1
+        file.write("time")
+        while i < n + 1:
+            file.write(", frequency %d"% i) 
             if(write_notes):
-                file.write(", %s" % convert_to_pitch(frequencies[i][j]))
+                file.write(", note %d" % i)
             if(write_amplitudes):
-                file.write(", %.4f" %amplitudes[i][j])
-            j+=1
-        i+=1
+                file.write(", amplitude %d" %i)
+            i+=1
         file.write("\n")
 
-    # close file
-    file.close()
+        # write data
+        i = 0
+        while i < len(times):
+            file.write("%.3f" % (times[i]))
+            j = 0
+            while j < len(frequencies[i]):
+                file.write(", %.4f" %frequencies[i][j])
+                if(write_notes):
+                    if(write_transcribed_note):
+                        file.write(", %s" % convert_to_pitch(frequencies[i][j]))
+                    else:
+                        if(round_midi):
+                            file.write(", %.0f" % convert_to_pitch(frequencies[i][j]))
+                        else:
+                            file.write(", %.2f" % convert_to_pitch(frequencies[i][j]))
+                if(write_amplitudes):
+                    file.write(", %.4f" %amplitudes[i][j])
+                j+=1
+            i+=1
+            file.write("\n")
+
+        # close file
+        file.close()
+    else:
+        out_name = filename.split('.')[0] + "_houdini_fps%d_n%d.txt" %(fps, n)
+        file = open("outputfiles/%s"%out_name, "w")
+        print("Writing to csv at outputfiles/%s"%out_name)
+        file.write("times = {")
+        # file.write("%.2f" % (times[0]))
+        i = 0
+        while i < len(times):
+            j = 0
+            while (j < len(frequencies[i])):
+                if(i == 0 and j == 0):
+                    file.write("%.2f" %times[i])
+                else:
+                    file.write(", %.2f" %times[i])
+                j+=1
+            i+=1
+        file.write("};\n\n")
+        file.write("midi = {")
+        i = 0
+        while i < len(frequencies):
+            j = 0
+            while (j < len(frequencies[i])):
+                if(i == 0 and j == 0):
+                    if(round_midi):
+                        file.write("%.0f" %convert_to_pitch(frequencies[i][j]))
+                    else:
+                        file.write("%.2f" %convert_to_pitch(frequencies[i][j]))
+                else:
+                    if(round_midi):
+                        file.write(", %.0f" %convert_to_pitch(frequencies[i][j]))
+                    else:
+                        file.write(", %.2f" %convert_to_pitch(frequencies[i][j]))
+
+                j+=1
+            i+=1
+        file.write("};\n\n")
+        file.write("amplitudes = {")
+        i = 0
+        while i < len(times):
+            j = 0
+            while (j < len(amplitudes[i])):
+                if(i == 0 and j == 0):
+                    file.write("%.2f" %amplitudes[i][j])
+                else:
+                    file.write(", %.2f" %amplitudes[i][j])
+                j+=1
+            i+=1
+        file.write("};\n")
+        file.close()
 
 # acquires audio onset times using librosa and smallest interval
 def get_onset_times(signal, sample_rate):
@@ -284,6 +350,7 @@ def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
         # -------------------------------------------------------------------------
 
         time_index+=1
+
     return times, frequencies, amplitudes
 
 
@@ -374,6 +441,42 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=4096, fps=3, n=2):
     # print(frequencies)
     # print(times)
     return times, frequencies, amplitudes 
+
+
+def filter_partials_note(times, frequencies, amplitudes):
+    i = 0
+    while i < len(times):
+        notes = []
+        j = 0
+        while j < len(frequencies[i]):
+            notes.append(convert_to_pitch(frequencies[i][j]))
+            k = 0
+            while k < j:
+                if(write_transcribed_note):
+                    if(notes[k] == notes[j]):
+                        # print("deleting duplicate note %s at i: %d j: %d\n"%(notes[k], i, j))
+                        # print(frequencies[i])
+                        # print(amplitudes[i])
+                        # print(notes)
+                        frequencies[i] = np.delete(frequencies[i], j, 0)
+                        amplitudes[i] = np.delete(amplitudes[i], j, 0)
+                        # frequencies[i].pop(j)
+
+                        # print(frequencies[i])
+                        # print(amplitudes[i])
+                        notes.pop(j)
+                        # print(notes)                    
+                        j = j - 1
+                    # elif(write_amplitudes):
+                else:
+                    if(round(notes[k]) == round(notes[j])):
+                        frequencies[i] = np.delete(frequencies[i], j, 0)
+                        amplitudes[i] = np.delete(amplitudes[i], j, 0)
+                        notes.pop(j)
+                        j = j - 1
+                k+=1
+            j+=1
+        i+=1
     
 
 if __name__ == "__main__":
