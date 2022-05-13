@@ -15,15 +15,18 @@ A4 = 440
 C0 = A4*pow(2, -4.75)
 note_vals = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
+# scaling controls
+max_output_amplitude = 100
+
 # write only one loudest bin per note
 filter_notes = True
 
 # controls for csv info
 write_amplitudes = True
 write_notes = True
-write_transcribed_note = False # only applies if write notes is true
-round_midi = True
-write_houdini = True
+write_transcribed_note = True # only applies if write notes is true
+round_midi = False # round midi values from decimal to integer
+write_houdini = False # write as regular arrays instead of csv
 
 # TODO: 
     # bool exclude_below_threshold <- boolean for excluding partials that are too quiet
@@ -47,10 +50,10 @@ def main(filename= default_name, fps=default_fps, n = default_n_partials):
         # times, frequencies, amplitudes = librosa_fft_analysis( signal=signal_lib, sample_rate=sample_rate_lib, fps=int(fps), n=n)
         centroid_calculation(signal = signal_lib, sample_rate=sample_rate_lib, fps = int(fps))
         # print(librosa.feature.spectral_centroid(y= signal_lib, sr= sample_rate_lib))
-        times, frequencies, amplitudes = n_loudest_peaks( signal=signal_lib, sample_rate=sample_rate_lib, fps=int(fps), n=n)
+        times, frequencies, amplitudes, max_read_amplitude = n_loudest_peaks( signal=signal_lib, sample_rate=sample_rate_lib, fps=int(fps), n=n)
         if filter_notes:
             filter_partials_note(times, frequencies, amplitudes)
-        csv_write(filename, False, int(fps), n, times, frequencies, amplitudes)
+        csv_write(filename, False, int(fps), n, times, frequencies, amplitudes, max_read_amplitude)
         
         # filename, fps, n, times, frequencies, amplitudes 
     # fft loudest partial collections
@@ -120,7 +123,7 @@ def convert_to_pitch(frequency):
 
 
 # write results to csv
-def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes):
+def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes, max_read_amplitude):
     if(write_houdini == False):
         # split file extension and append fps/bucket info
         if(os_mode == False):
@@ -158,7 +161,7 @@ def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes):
                         else:
                             file.write(", %.2f" % convert_to_pitch(frequencies[i][j]))
                 if(write_amplitudes):
-                    file.write(", %.4f" %amplitudes[i][j])
+                    file.write(", %.4f" %((amplitudes[i][j]/max_read_amplitude)*max_output_amplitude))
                 j+=1
             i+=1
             file.write("\n")
@@ -289,7 +292,6 @@ def centroid_calculation(signal, sample_rate, n_fft=4096, fps=3, n=2):
             file.write("\n")
         time_index +=1
 
-
 def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
     hop_length = int(sample_rate/fps)
     fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
@@ -298,7 +300,7 @@ def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
     frequencies = []
     amplitudes = []
     times = []
-    
+    max_read_amplitude = 0
     # Reference array containing corresponding frequency values relative to bin indexes
     fft_freqs = librosa.fft_frequencies(sr = sample_rate, n_fft = n_fft)
     # print(fft_set.shape)
@@ -311,6 +313,7 @@ def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
         freq_index = 1
         # if(time_index == 4):
         peak_indexes = []
+        
 
         while (freq_index < (n_fft/2)):
             if(fft_set[freq_index, time_index] > fft_set[freq_index-1, time_index]):
@@ -342,7 +345,9 @@ def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
         else:    
             n_loudest_indexes = np.argsort(-fft_set[:,time_index])[:n]
         n_loudest_amplitudes = fft_set[n_loudest_indexes, time_index]
-
+        if(n_loudest_amplitudes[0] > max_read_amplitude):
+            max_read_amplitude = n_loudest_amplitudes[0]
+        
         frequency_array = fft_freqs[n_loudest_indexes]
         frequencies.append(frequency_array)
         amplitudes.append(n_loudest_amplitudes)
@@ -351,7 +356,7 @@ def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
 
         time_index+=1
 
-    return times, frequencies, amplitudes
+    return times, frequencies, amplitudes, max_read_amplitude
 
 
 # acquire n loudest partials from sample using librosa fft
