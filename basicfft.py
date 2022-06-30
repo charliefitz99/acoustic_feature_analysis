@@ -10,34 +10,37 @@ import scipy.io.wavfile as wavfile
 import sys
 import os
 
+# See user manual for more details on these controls
+
+# input controls
+default_name = 'fft_test.wav' # located inside "soundfiles" folder
+default_fps = 24
+default_n_partials = 15
+
+# Select type of output to write: 
+create_csv = True # write as a csv with time on left axis
+create_houdini_arrays = True # write as a series of arrays for each data field, separated by line
+create_harmonics_list = True # write a list n_partials long of loudest harmonics in the entire sample
+
+# Select data type for write:
+write_frequencies = False # write frequency for harmonics
+write_amplitudes = True # write amplitudes corresponding to harmonics
+write_notes = True # write note values for selected harmonics
+
+# Controls for data display
+max_output_amplitude = 100 # value to scale maximum output amplitude to
+transcribe_note = True # if true, write as note (CDEFGAB). if false, write as midi number value
+round_midi = False # round midi values from decimal to integer if transcribed_note = False
+filter_notes = True # only write the loudest harmonic detected for each individual midi note
+exclude_below_threshold = True # exclude harmonics with amplitudes less than exclusion_threshold
+exclusion_threshold = 20 # minimum amplitude value to include.
+
 # constants for pitch detection
 A4 = 440
 C0 = A4*pow(2, -4.75)
 note_vals = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
-# scaling controls
-max_output_amplitude = 100
-
-# write only one loudest bin per note
-filter_notes = True
-
-# controls for csv info
-write_amplitudes = True
-write_notes = True
-write_transcribed_note = True # only applies if write notes is true
-round_midi = False # round midi values from decimal to integer
-write_houdini = False # write as regular arrays instead of csv
-
-# TODO: 
-    # bool exclude_below_threshold <- boolean for excluding partials that are too quiet
-    # int exclusion_threshold <- write below certain amplitude
-    # bool create_pitch_csv <- create separate csv for pitch values
-
-default_name = 'fft_test.wav'
-default_fps = 24
-default_n_partials = 15
-
-def main(filename= default_name, fps=default_fps, n = default_n_partials):
+def main(filename = default_name, fps = default_fps, n = default_n_partials):
     
     # load signal(s) from default audio directory 'soundfiles/'
     signal_lib, sample_rate_lib = load_audio_librosa(filename) # in stereo?
@@ -45,15 +48,15 @@ def main(filename= default_name, fps=default_fps, n = default_n_partials):
 
     if(fps == "os"):
         times, frequencies, amplitudes = onset_fft_analysis(signal = signal_lib, sample_rate=sample_rate_lib, n=n)
-        csv_write(filename, True, 0, n, times, frequencies, amplitudes)
+        file_write(filename, True, 0, n, times, frequencies, amplitudes)
     else:
         # times, frequencies, amplitudes = librosa_fft_analysis( signal=signal_lib, sample_rate=sample_rate_lib, fps=int(fps), n=n)
         centroid_calculation(signal = signal_lib, sample_rate=sample_rate_lib, fps = int(fps))
         # print(librosa.feature.spectral_centroid(y= signal_lib, sr= sample_rate_lib))
         times, frequencies, amplitudes, max_read_amplitude = n_loudest_peaks( signal=signal_lib, sample_rate=sample_rate_lib, fps=int(fps), n=n)
         if filter_notes:
-            filter_partials_note(times, frequencies, amplitudes)
-        csv_write(filename, False, int(fps), n, times, frequencies, amplitudes, max_read_amplitude)
+            filter_partials_by_note(times, frequencies, amplitudes)
+        file_write(filename, False, int(fps), n, times, frequencies, amplitudes, max_read_amplitude)
         
         # filename, fps, n, times, frequencies, amplitudes 
     # fft loudest partial collections
@@ -105,7 +108,7 @@ def convert_to_pitch(frequency):
     
     # check if frequency is 0 (likely error)
     if(frequency != 0):
-        if(write_transcribed_note):
+        if(transcribe_note):
             midi_num = round(12*log2(frequency/C0))
             octave = midi_num//12 # floor division for octave number
             note_index = midi_num % 12 
@@ -123,8 +126,8 @@ def convert_to_pitch(frequency):
 
 
 # write results to csv
-def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes, max_read_amplitude):
-    if(write_houdini == False):
+def file_write(filename, os_mode, fps, n, times, frequencies, amplitudes, max_read_amplitude):
+    if(create_csv):
         # split file extension and append fps/bucket info
         if(os_mode == False):
             out_name = filename.split('.')[0] + "_fps%d_n%d.csv" %(fps, n)
@@ -137,7 +140,8 @@ def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes, max_rea
         i = 1
         file.write("time")
         while i < n + 1:
-            file.write(", frequency %d"% i) 
+            if(write_frequencies):
+                file.write(", frequency %d"% i) 
             if(write_notes):
                 file.write(", note %d" % i)
             if(write_amplitudes):
@@ -151,24 +155,28 @@ def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes, max_rea
             file.write("%.3f" % (times[i]))
             j = 0
             while j < len(frequencies[i]):
-                file.write(", %.4f" %frequencies[i][j])
-                if(write_notes):
-                    if(write_transcribed_note):
-                        file.write(", %s" % convert_to_pitch(frequencies[i][j]))
-                    else:
-                        if(round_midi):
-                            file.write(", %.0f" % convert_to_pitch(frequencies[i][j]))
+                if((exclude_below_threshold == False) or 
+                    ((amplitudes[i][j]/max_read_amplitude)*max_output_amplitude) > exclusion_threshold):
+                    if(write_frequencies):
+                        file.write(", %.4f" %frequencies[i][j])
+                    if(write_notes):
+                        if(transcribe_note):
+                            file.write(", %s" % convert_to_pitch(frequencies[i][j]))
                         else:
-                            file.write(", %.2f" % convert_to_pitch(frequencies[i][j]))
-                if(write_amplitudes):
-                    file.write(", %.4f" %((amplitudes[i][j]/max_read_amplitude)*max_output_amplitude))
+                            if(round_midi):
+                                file.write(", %.0f" % convert_to_pitch(frequencies[i][j]))
+                            else:
+                                file.write(", %.2f" % convert_to_pitch(frequencies[i][j]))
+                    if(write_amplitudes):
+                        # file.write(", %.4f" %amplitudes[i][j]) # unscaled
+                        file.write(", %.2f" %((amplitudes[i][j]/max_read_amplitude)*max_output_amplitude))
                 j+=1
             i+=1
             file.write("\n")
 
         # close file
         file.close()
-    else:
+    if(create_houdini_arrays):
         out_name = filename.split('.')[0] + "_houdini_fps%d_n%d.txt" %(fps, n)
         file = open("outputfiles/%s"%out_name, "w")
         print("Writing to csv at outputfiles/%s"%out_name)
@@ -191,16 +199,21 @@ def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes, max_rea
             j = 0
             while (j < len(frequencies[i])):
                 if(i == 0 and j == 0):
-                    if(round_midi):
-                        file.write("%.0f" %convert_to_pitch(frequencies[i][j]))
+                    if(transcribe_note is False):
+                        if(round_midi):
+                            file.write("%.0f" %convert_to_pitch(frequencies[i][j]))
+                        else:
+                            file.write("%.2f" %convert_to_pitch(frequencies[i][j]))
                     else:
-                        file.write("%.2f" %convert_to_pitch(frequencies[i][j]))
+                        file.write("%s" %convert_to_pitch(frequencies[i][j]))
                 else:
-                    if(round_midi):
-                        file.write(", %.0f" %convert_to_pitch(frequencies[i][j]))
+                    if(transcribe_note is False):
+                        if(round_midi):
+                            file.write(", %.0f" %convert_to_pitch(frequencies[i][j]))
+                        else:
+                            file.write(", %.2f" %convert_to_pitch(frequencies[i][j]))
                     else:
-                        file.write(", %.2f" %convert_to_pitch(frequencies[i][j]))
-
+                        file.write(", %s" %convert_to_pitch(frequencies[i][j]))
                 j+=1
             i+=1
         file.write("};\n\n")
@@ -217,7 +230,49 @@ def csv_write(filename, os_mode, fps, n, times, frequencies, amplitudes, max_rea
             i+=1
         file.write("};\n")
         file.close()
-
+    if(create_harmonics_list):
+        out_name = filename.split('.')[0] + "_partial_list_n%d.txt" %(n)
+        file = open("outputfiles/%s"%out_name, "w")
+        print("Writing to csv at outputfiles/%s"%out_name)
+        i = 0
+        notes = []
+        while(i < len(frequencies)):
+            j = 0
+            while(j < len(frequencies[i])):
+                note_tuple = []
+                note_tuple.append(convert_to_pitch(frequencies[i][j]))
+                note_tuple.append(amplitudes[i][j])
+                found = False
+                k = 0
+                while(k < len(notes)):
+                    if(notes[k][0] == note_tuple[0]):
+                        # found = True
+                        if(notes[k][1] < note_tuple[1]):
+                            # elem[1] = note_tuple[1]
+                            notes.pop(k)
+                        else:
+                            found = True
+                    k+=1
+                k = 0
+                # while(k < len(notes) and found == False):
+                while(k < len(notes) and found == False):
+                    if(note_tuple[1] > notes[k][1]):
+                        notes.insert(k, note_tuple)
+                        found = True
+                        if(len(notes) >= n):
+                            notes.pop(len(notes)-1)
+                    k+=1
+                if (found == False and len(notes) < n):
+                    notes.append(note_tuple)
+                j+=1
+            i+=1
+        for note in notes:
+            if(transcribe_note):
+                file.write("\n%s" %note[0])
+            if(write_amplitudes):
+                file.write(", %.2f" %((note[1]/max_read_amplitude)*max_output_amplitude))
+        file.close()
+            
 # acquires audio onset times using librosa and smallest interval
 def get_onset_times(signal, sample_rate):
     o_env = librosa.onset.onset_strength(y=signal, sr = sample_rate)
@@ -295,7 +350,7 @@ def centroid_calculation(signal, sample_rate, n_fft=4096, fps=3, n=2):
 def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
     hop_length = int(sample_rate/fps)
     fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
-    fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
+    # fft_set = np.abs(librosa.stft(signal, center=False, n_fft=n_fft, hop_length = hop_length))
     time_index = 0 
     frequencies = []
     amplitudes = []
@@ -304,8 +359,7 @@ def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
     # Reference array containing corresponding frequency values relative to bin indexes
     fft_freqs = librosa.fft_frequencies(sr = sample_rate, n_fft = n_fft)
     # print(fft_set.shape)
-    # peaks = np.zeros(fft_set.shape)
-    # print(peaks.shape)
+
     while time_index < len(fft_set[0]):
     
         # Grab peak bin indexes ----------------------------------------------------------
@@ -335,7 +389,6 @@ def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
             if is_peak == False:
                 fft_set[freq_index, time_index] = 0
             freq_index += 1
-            
 
         # -------------------------------------------------------------------------
 
@@ -345,8 +398,8 @@ def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
         else:    
             n_loudest_indexes = np.argsort(-fft_set[:,time_index])[:n]
         n_loudest_amplitudes = fft_set[n_loudest_indexes, time_index]
-        if(n_loudest_amplitudes[0] > max_read_amplitude):
-            max_read_amplitude = n_loudest_amplitudes[0]
+        # if(n_loudest_amplitudes[0] > max_read_amplitude):
+        #     max_read_amplitude = n_loudest_amplitudes[0]
         
         frequency_array = fft_freqs[n_loudest_indexes]
         frequencies.append(frequency_array)
@@ -355,7 +408,10 @@ def n_loudest_peaks(signal, sample_rate, n_fft=4096, fps=3, n=2):
         # -------------------------------------------------------------------------
 
         time_index+=1
-
+    for amp in amplitudes:
+        if(len(amp) > 0):
+            if(amp[0] > max_read_amplitude):
+                max_read_amplitude = amp[0]   
     return times, frequencies, amplitudes, max_read_amplitude
 
 
@@ -448,7 +504,7 @@ def librosa_fft_analysis(signal, sample_rate, n_fft=4096, fps=3, n=2):
     return times, frequencies, amplitudes 
 
 
-def filter_partials_note(times, frequencies, amplitudes):
+def filter_partials_by_note(times, frequencies, amplitudes):
     i = 0
     while i < len(times):
         notes = []
@@ -457,7 +513,7 @@ def filter_partials_note(times, frequencies, amplitudes):
             notes.append(convert_to_pitch(frequencies[i][j]))
             k = 0
             while k < j:
-                if(write_transcribed_note):
+                if(transcribe_note):
                     if(notes[k] == notes[j]):
                         # print("deleting duplicate note %s at i: %d j: %d\n"%(notes[k], i, j))
                         # print(frequencies[i])
