@@ -23,7 +23,7 @@ create_houdini_arrays = True # write as a series of arrays for each data field, 
 create_harmonics_list = True # write a list n_partials long of loudest harmonics in the entire sample
 
 # Select data type for write:
-write_frequencies = False # write frequency for harmonics
+write_frequencies = True # write frequency for harmonics
 write_amplitudes = True # write amplitudes corresponding to harmonics
 write_notes = True # write note values for selected harmonics
 
@@ -242,6 +242,7 @@ def file_write(filename, os_mode, fps, n, times, frequencies, amplitudes, max_re
                 note_tuple = []
                 note_tuple.append(convert_to_pitch(frequencies[i][j]))
                 note_tuple.append(amplitudes[i][j])
+                note_tuple.append(frequencies[i][j])
                 found = False
                 k = 0
                 while(k < len(notes)):
@@ -271,6 +272,8 @@ def file_write(filename, os_mode, fps, n, times, frequencies, amplitudes, max_re
                 file.write("\n%s" %note[0])
             if(write_amplitudes):
                 file.write(", %.2f" %((note[1]/max_read_amplitude)*max_output_amplitude))
+            if(write_frequencies):
+                file.write(", %.2f" %note[2])
         file.close()
             
 # acquires audio onset times using librosa and smallest interval
